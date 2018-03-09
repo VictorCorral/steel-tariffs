@@ -58,15 +58,29 @@ fancy_plot <- function(x, ctr = "United States of America", cols = c("gray", "to
     coli <- grDevices::rgb(
       coli[1], coli[2], coli[3],
       maxColorValue = 255,
-      alpha = 200
+      alpha = 70
       )
       
+    qty <- qty*20
     xspline(
-      x     = c(y, y+.25, y+.5, y + .5, y+.25, y),
-      y     = c(from, from*curve[1] + (to + qty/2)*curve[2],to + qty/2, to - qty/2, from*curve[1] + (to - qty/2)*curve[2], from),
-      col   = coli,
-      shape = c(-.7, -.7, 0, .7, .7),
-      border = NA, open = FALSE
+      x     = c(
+        y,
+        y + .25,
+        y + .5,
+        y + .5,
+        y + .25,
+        y),
+      y     = c(
+        from + qty/2,
+        from*curve[1] + (to + qty/2)*curve[2],
+        to + qty/2,
+        to - qty/2, from*curve[1] + (to - qty/2)*curve[2],
+        from - qty/2
+        ),
+      col    = coli,
+      shape  = -.5, #c(-.7, -.7, 0, .7, .7),
+      border = NA,
+      open   = FALSE
       # lwd    = (qty^(1.5)*max_received)^(1/1.5)
       )
   }
@@ -75,7 +89,7 @@ fancy_plot <- function(x, ctr = "United States of America", cols = c("gray", "to
   for (y in years[-length(years)]) {
   
     # Receiving countries
-    z <- dat %>%
+    z <- x %>%
       filter(yr_impl == y & ctry1_rep == ctr) %>%
       group_by(ctry2_par) %>%
       summarize(
@@ -85,7 +99,7 @@ fancy_plot <- function(x, ctr = "United States of America", cols = c("gray", "to
       rename(name = ctry2_par) %>%
       dplyr::left_join(ids, by = "name") %>%
       mutate(
-        received = coalesce(received, 0)
+        received = coalesce(received, 0L)
       )
       
     # Is there any data?
@@ -105,7 +119,7 @@ fancy_plot <- function(x, ctr = "United States of America", cols = c("gray", "to
   for (y in years[-length(years)]) {
     
     # Receiving countries
-    z <- dat %>%
+    z <- x %>%
       filter(yr_impl == y & ctry2_par == ctr) %>%
       group_by(ctry1_rep) %>%
       summarize(
@@ -115,7 +129,7 @@ fancy_plot <- function(x, ctr = "United States of America", cols = c("gray", "to
       rename(name = ctry1_rep) %>%
       dplyr::left_join(ids, by = "name") %>%
       mutate(
-        received = coalesce(received, 0)
+        received = coalesce(received, 0L)
       )
     
     # Is there any data?
@@ -126,7 +140,7 @@ fancy_plot <- function(x, ctr = "United States of America", cols = c("gray", "to
     z$received <- with(z, received/max_received)
     
     for (i in 1:nrow(z)) {
-      myxspline(y, from = z$id[i], to = ctr_id, qty = z$received[i], curve = c(.8, .2))
+      myxspline(y = y, from = z$id[i], to = ctr_id, qty = z$received[i], curve = c(.8, .2))
     }
     
   }
@@ -138,5 +152,5 @@ fancy_plot <- function(x, ctr = "United States of America", cols = c("gray", "to
 }
 
 dat %>% 
-  filter(yr_impl >= 2016, yr_impl <= 2018) %>%
+  filter(yr_impl >= 2014, yr_impl <= 2018, protec1 >= 20) %>%
   fancy_plot
