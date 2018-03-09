@@ -62,9 +62,12 @@ fancy_plot <- function(x, ctr = "United States of America", cols = c("gray", "to
       )
       
     xspline(
-      x = c(y, y+.25, y+.5),
-      y = c(from, from*curve[1] + to*curve[2] ,to),
-      border = coli, shape = -.7, lwd=(qty^(1.5)*max_received)^(1/1.5)
+      x     = c(y, y+.25, y+.5, y + .5, y+.25, y),
+      y     = c(from, from*curve[1] + (to + qty/2)*curve[2],to + qty/2, to - qty/2, from*curve[1] + (to - qty/2)*curve[2], from),
+      col   = coli,
+      shape = c(-.7, -.7, 0, .7, .7),
+      border = NA, open = FALSE
+      # lwd    = (qty^(1.5)*max_received)^(1/1.5)
       )
   }
   
@@ -135,5 +138,5 @@ fancy_plot <- function(x, ctr = "United States of America", cols = c("gray", "to
 }
 
 dat %>% 
-  filter(yr_impl >= 2013 & yr_impl <= 2018) %>%
+  filter(yr_impl >= 2016, yr_impl <= 2018) %>%
   fancy_plot
