@@ -15,19 +15,7 @@ fancy_plot <- function(x, ctr = "United States of America", cols = c("gray", "to
     name = ids
   ) 
   
-  # Setting us in the middle 
-  ctr_id <- as.integer(floor(nrow(ids)/2))
-  ids[ids$id >= ctr_id, 1L] <- ids[ids$id >= ctr_id, 1L] + 1L
-  ids <- rbind(
-    ids,
-    tibble::tibble(
-      id = ctr_id, 
-      name = ctr
-    )) %>%
-    arrange(id)
-  
   # Creating color palette -----------------------------------------------------
-  colfun <- grDevices::colorRamp(cols)
   xran <- x %>%
     group_by(ctry2_par, yr_impl) %>%
     filter(ctry1_rep == ctr) %>%
@@ -47,54 +35,64 @@ fancy_plot <- function(x, ctr = "United States of America", cols = c("gray", "to
   # Creating the plot ----------------------------------------------------------
   oldpar <- graphics::par(no.readonly = TRUE)
   on.exit(graphics::par(oldpar))
-  par(las = 2, mai = oldpar$mai*c(1,1.5,0,1))
+  par(las = 2, mai = oldpar$mai*c(1.5,2.5,0,1))
   plot.new()
   plot.window(xlim = range(years), ylim = range(ids$id))
   
   # Maxi height
-  MAX_H <- nrow(ids)/10
+  MAX_H <- 1
   
   # Wrapper of xspline
-  myxspline <- function(year, from, to, qty_from, qty_to, col, curve = c(.2, .8)) {
-    
-    # coli <- colfun(qty_to)
-    # coli <- grDevices::rgb(
-    #   coli[1], coli[2], coli[3],
-    #   maxColorValue = 255,
-    #   alpha = 70
-    #   )
-      
-    qty_from <- qty_from*MAX_H
-    qty_to   <- qty_to*MAX_H
+  myxspline <- function(year, from, to, qty_from, qty_to, col, curve = c(.5, .5)) {
+
     
     if (!qty_from & qty_to)
       return(NULL)
     
+    # Readjusting quantities
+    qty <- qty_from + qty_from
+    qty_from <- qty_from/qty
+    qty_to   <- qty_to/qty
+    curve    <- curve/sum(curve)
+
+    # Adjusting the color
+    col <- grDevices::adjustcolor(col, 1-abs(qty_to - qty_from)/(qty_from + qty_to))
+    
     xspline(
       x     = c(
         year,
-        year + .5,
-        year + 1,
-        year + 1,
-        year + .5,
+        year + 0.5,
+        year + 1.0,
+        year + 1.0,
+        year + 0.5,
         year),
       y     = c(
         from + qty_from/2,
-        (from + qty_from/2)*curve[1] + (to + qty_to/2)*curve[2],
+        (from + qty_from/20)*curve[1] + (to + qty_to/20)*curve[2],
         to + qty_to/2,
-        to - qty_to/2, (from - qty_from/2)*curve[1] + (to - qty_to/2)*curve[2],
+        to - qty_to/2,
+        (from - qty_from/20)*curve[1] + (to - qty_to/20)*curve[2],
         from - qty_from/2
         ),
-      col    = grDevices::adjustcolor(col, 1-abs(qty_to - qty_from)/1.25),
-      shape  = c(0, -.7, 0, 0, .7, 0),
-      border = NA,
+      col    = col,
+      shape  = c(0, -.9, 0, 0, .9, 0),
+      border = col, #adjustcolor("black", .5),
       open   = FALSE
       # lwd    = (qty^(1.5)*max_received)^(1/1.5)
       )
   }
   
+  # Colors
+  cols <- viridis::viridis(nrow(ids))
+  
+  # Adding a grid
   for (i in ids$id)
-    abline(h = i, col = adjustcolor(i, .3), lwd=1, lty=2)
+    symbols(x = mean(years), y = i, rectangles = cbind(max(years) - min(years), 1),
+            bg = adjustcolor(cols[i], .3), add=TRUE, inches = FALSE,
+            fg = "white"
+            )
+    
+  
   
   # From US to the world
   for (y in years[-length(years)]) {
@@ -102,12 +100,11 @@ fancy_plot <- function(x, ctr = "United States of America", cols = c("gray", "to
     # Receiving countries
     z_from <- x %>%
       filter(yr_impl == y & ctry1_rep == ctr) %>%
-      group_by(ctry2_par) %>%
-      summarize(
-        sent = sum(protec1)
-      ) %>%
+      rename(
+        sent = protec1,
+        name = ctry2_par
+        ) %>%
       filter(sent > 0) %>%
-      rename(name = ctry2_par) %>%
       dplyr::left_join(ids, by = "name") %>%
       transmute(
         country = id,
@@ -117,13 +114,12 @@ fancy_plot <- function(x, ctr = "United States of America", cols = c("gray", "to
     
     # Receiving countries
     z_to <- x %>%
-      filter(yr_impl == (y + 1L) & ctry2_par == ctr) %>%
-      group_by(ctry1_rep) %>%
-      summarize(
-        received = sum(protec1)
-      ) %>%
+      filter(yr_impl == (y ) & ctry2_par == ctr) %>%
+      rename(
+        received = protec1,
+        name = ctry1_rep
+        ) %>%
       filter(received > 0) %>%
-      rename(name = ctry1_rep) %>%
       dplyr::left_join(ids, by = "name") %>%
       transmute(
         country  = id,
@@ -142,26 +138,73 @@ fancy_plot <- function(x, ctr = "United States of America", cols = c("gray", "to
       )
     
     for (i in 1:nrow(d)) {
-      # myxspline(y = y, from = z$id[i], to = ctr_id, qty = z$received[i], curve = c(.8, .2))
       myxspline(
         year = y,
         from = d$country[i],
         to   = d$country[i],
         qty_from = d$from[i],
         qty_to   = d$to[i],
-        curve = c(.8, .2),
-        col = d$country[i]
+        curve = c(.5, .5),
+        col = cols[d$country[i]]
         )
     }
     
   }
   
-  axis(1, labels = years, at = years)
-  axis(2, labels = ids$name, at = ids$id, cex.axis=.5, tick = FALSE)
+  # Adding axis
+  axis(1, labels = years, at = years, tick = FALSE, line = -1.5, cex.axis = .7)
+  axis(2, labels = ids$name, at = ids$id, cex.axis=.5, tick = FALSE, line = -1.5)
   
-  
+  par(mai = rep(0, 4))
+  plot.window(xlim=c(0,3), ylim=c(0,15))
+  myxspline(
+    year = 1,
+    from = 1,
+    to   = 1,
+    qty_from = 2,
+    qty_to = 2,
+    col = "lightgray"
+  )
+  text(x = 1.5, y = 1.5, labels = "Policy flows", cex = .75, font=2)
+  text(
+    x = .9, y = 1,
+    labels = sprintf("Relative number of\nprotectionist policies from\n%s", ctr),
+    pos = 2, cex = .75)
+  text(x = 1, y = 1, labels = "[", pos = 2, cex=2)
+  text(
+    x = 2.1, y = 1,
+    labels = sprintf("Relative number of\nprotectionist policies sent to\n%s", ctr),
+    pos = 4, cex = .75)
+  text(x = 2, y = 1, labels = "]", pos = 4, cex=2)
+  text(
+    x = 1.5, y = .5, pos = 1,
+    labels = "Transparency porportional to\nlack of reciprocity", cex=.75, col = gray(.1)
+  )
+
 }
 
-dat %>% 
-  filter(yr_impl >= 2014, yr_impl <= 2017, protec1 >= 20) %>%
-  fancy_plot
+ids <- dat %$% c(ctry1_rep, ctry2_par) %>%
+  unique %>% sort 
+
+ids <- tibble::tibble(
+  id = seq_along(ids),
+  name = ids
+)
+
+
+for (i in 0:3) {
+  group1 <- ids[(1:56) + 56*i,]
+  group1 <- as.vector(group1$name)
+  
+  graphics.off()
+  pdf(sprintf("plot%02i.pdf", i))
+  
+  dat %>% 
+    filter(
+      (ctry1_rep == "United States of America" & ctry2_par %in% group1) |
+      (ctry1_rep %in% group1 & ctry2_par == "United States of America")
+      ) %>%
+    fancy_plot
+  
+  dev.off()
+}
