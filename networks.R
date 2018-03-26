@@ -50,26 +50,38 @@ dat_lagged <- dat %>%
 sent_lagged[as.matrix(dat_lagged[,1:3])] <- dat_lagged$sent
 sent_lagged[is.na(sent_lagged)] <- 0
 
-# Creating igraph objects
+# Exporting the data to excel --------------------------------------------------
+
+WriteXLS::WriteXLS(
+  apply(sent, 3, as.data.frame),
+  ExcelFileName = "sent.xls",
+  row.names = TRUE
+  )
+
+
+# Creating igraph objects ------------------------------------------------------
 library(igraph)
 
-sent <- apply(sent, 3, igraph::graph_from_adjacency_matrix, mode = "directed", weighted = TRUE)
+ig_sent <- apply(sent, 3, igraph::graph_from_adjacency_matrix, mode = "directed", weighted = TRUE)
 
 fancy_plot <- function(x) {
   
   set.seed(1)
   Edge  <- E(x)$weight
-  Vcol  <- viridis::viridis(vcount(x), alpha = .7)
-  Ecol  <- Vcol[match(as_edgelist(x)[, 1], countries)]
+  Vcol  <- viridisLite::viridis(vcount(x))
+  Ecol  <- unname(unlist(Map(
+    function(col, a) adjustcolor(col, a),
+    col = Vcol[match(as_edgelist(x)[, 1], countries)],
+    a   = Edge/max(Edge)
+  ), recursive = TRUE))
+  
   Vsize <- colSums(as.matrix(as_adj(x, attr = "weight")))
   
   pos   <- layout_in_circle(x)
   
-  oldpar <- par(no.readonly = TRUE)
-  on.exit(par(oldpar))
-  par(mai = rep(.5, 4), xpd = NA)
   plot.new()
   plot.window(xlim = range(pos[,1]), ylim = range(pos[,2]))
+  Vsize <- netdiffuseR::igraph_vertex_rescale(Vsize, minmax.relative.size = c(.05, .1))
   
   plot(
     x,
@@ -78,15 +90,40 @@ fancy_plot <- function(x) {
     edge.curved         = TRUE,
     edge.color          = Ecol,
     vertex.color        = Vcol,
-    vertex.frame.color  = adjustcolor(Vcol, alpha.f = 2),
+    vertex.frame.color  = Vcol,
     vertex.label.family = "sans",
     vertex.label.color  = "black",
-    vertex.size         = netdiffuseR::igraph_vertex_rescale(Vsize, minmax.relative.size = c(.05, .1)),
+    vertex.label.cex    = 1.25,
+    vertex.size         = Vsize,
     edge.arrow.mode     = "-",
+    vertex.label.dist   = 3,
+    vertex.label.degree = atan2(-pos[,2], pos[,1]),
     rescale = FALSE,
     add = TRUE
     )
   
 }
 
-fancy_plot(sent$`2015`)
+# Creating the fancy plots -----------------------------------------------------
+
+graphics.off()
+tiff(filename = "networks.tiff", width = 1024, height = 1024)
+oldpar <- par(no.readonly = TRUE)
+par(mfrow = c(3, 3), mai = rep(.5, 4), xpd=NA, oma = c(3,0,3,0))
+for (s in names(ig_sent[-c(1:2)])) {
+  fancy_plot(ig_sent[[s]])
+  title(main = s, cex = 1.25)
+}
+  
+par(mfrow = c(1, 1), mai=rep(0, 4), oma = c(3, 0, 2.5, 0))
+box()
+mtext("Protectionist networks", 3, cex=1.5, outer=TRUE)
+mtext(
+  "Note: Edge width by number of protectionist policies, and colors by country of origin",
+  1,
+  outer = TRUE,
+  cex=1
+  )
+par(oldpar)
+dev.off()
+
