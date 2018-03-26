@@ -56,7 +56,7 @@ fancy_plot <- function(x, ctr = "United States of America", cols = c("gray", "to
     curve    <- curve/sum(curve)
 
     # Adjusting the color
-    col <- grDevices::adjustcolor(col, 1-abs(qty_to - qty_from)/(qty_from + qty_to))
+    colt <- grDevices::adjustcolor(col, 1-abs(qty_to - qty_from)/(qty_from + qty_to))
     
     xspline(
       x     = c(
@@ -74,11 +74,11 @@ fancy_plot <- function(x, ctr = "United States of America", cols = c("gray", "to
         (from - qty_from/20)*curve[1] + (to - qty_to/20)*curve[2],
         from - qty_from/2
         ),
-      col    = col,
+      col    = colt,
       shape  = c(0, -.9, 0, 0, .9, 0),
-      border = col, #adjustcolor("black", .5),
-      open   = FALSE
-      # lwd    = (qty^(1.5)*max_received)^(1/1.5)
+      border = adjustcolor(col, .5),
+      open   = FALSE,
+      lwd    = 0.5
       )
   }
   
